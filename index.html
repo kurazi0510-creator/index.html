@@ -195,6 +195,8 @@
 
   <div class="panel">
     <div class="panel-title">⏰ 空き時間</div>
+    <button class="btn-add" style="width:100%;margin-bottom:10px;background:#2e7d32;color:#fff;font-size:13px;padding:10px;" onclick="autoFetchAvailability()">🔄 予約表と連動して自動取得</button>
+    <div id="autoFetchStatus" style="font-size:11px;color:#888;text-align:center;margin-bottom:8px;"></div>
     <div class="time-selected-area" id="chipArea">
       <span class="no-sel" id="noSelMsg">時間を選んでください</span>
     </div>
@@ -316,6 +318,47 @@ const AM_TIMES=['8時30分','8時50分','9時10分','9時30分','9時50分',
   '10時10分','10時30分','10時50分','11時10分','11時30分','11時50分','12時10分','12時30分'];
 const PM_TIMES=['15時','15時20分','15時40分','16時','16時20分','16時40分',
   '17時','17時20分','17時40分','18時','18時20分','18時40分','19時','19時20分','19時40分'];
+
+// 予約システム側の"HH:MM"形式と、この画面の日本語表記を相互変換するための対応表
+const HHMM_TO_JP={
+  '08:30':'8時30分','08:50':'8時50分','09:10':'9時10分','09:30':'9時30分','09:50':'9時50分',
+  '10:10':'10時10分','10:30':'10時30分','10:50':'10時50分','11:10':'11時10分','11:30':'11時30分',
+  '11:50':'11時50分','12:10':'12時10分','12:30':'12時30分',
+  '15:00':'15時','15:20':'15時20分','15:40':'15時40分','16:00':'16時','16:20':'16時20分','16:40':'16時40分',
+  '17:00':'17時','17:20':'17時20分','17:40':'17時40分','18:00':'18時','18:20':'18時20分','18:40':'18時40分',
+  '19:00':'19時','19:20':'19時20分','19:40':'19時40分',
+};
+// 倉治整骨院 管理システムのGAS（予約表データの取得元）
+const KURAJI_GAS='https://script.google.com/macros/s/AKfycbxN8GuaDOG2WnR9OiJINtqoMOz2guWn-TrmRlkLQIs3QAvuLZxDh1obSNGDbpFto2oltg/exec';
+
+async function autoFetchAvailability(){
+  const dateVal=document.getElementById('yDate').value;
+  const statusEl=document.getElementById('autoFetchStatus');
+  if(!dateVal){ alert('先に日付を選んでください'); return; }
+  statusEl.textContent='🔄 予約表を確認中...';
+  try{
+    const res=await fetch(`${KURAJI_GAS}?action=getAvailableSlots&date=${dateVal}&t=${Date.now()}`,{cache:'no-store'});
+    const d=await res.json();
+    if(!d.ok){ statusEl.textContent='❌ 取得に失敗しました'; return; }
+    if(d.closed){ statusEl.textContent='📕 この日は休診日です'; clearAll(); return; }
+    // 一度リセットしてから、空いている時間だけを選択状態にする
+    clearAll();
+    (d.available||[]).forEach(hhmm=>{
+      const jp=HHMM_TO_JP[hhmm];
+      if(!jp) return;
+      const btn=document.querySelector(`.t-btn[data-time="${jp}"]`);
+      if(btn && !selTimes.includes(jp)){
+        const type=btn.dataset.type;
+        selTimes.push(jp);
+        btn.classList.add(type==='am'?'am-sel':'pm-sel');
+      }
+    });
+    renderChips();
+    statusEl.textContent=`✅ ${d.available.length}件の空き時間を自動反映しました`;
+  }catch(e){
+    statusEl.textContent='❌ 通信エラー：'+e.message;
+  }
+}
 
 let yColor='#f5a731';
 let selTimes=[];
