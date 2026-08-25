@@ -341,9 +341,23 @@ async function autoFetchAvailability(){
     const d=await res.json();
     if(!d.ok){ statusEl.textContent='❌ 取得に失敗しました'; return; }
     if(d.closed){ statusEl.textContent='📕 この日は休診日です'; clearAll(); return; }
+
+    // ★選んだ日が「今日」の場合は、現在時刻より前の枠（もう終わっている時間）を除外する
+    // 例：作成時刻が14時なら、午前の枠は表示せず、これから始まる午後の枠だけを対象にする
+    const now=new Date();
+    const todayStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+    let available=d.available||[];
+    let filteredCount=0;
+    if(dateVal===todayStr){
+      const nowHHMM=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+      const before=available.length;
+      available=available.filter(hhmm=>hhmm>nowHHMM);
+      filteredCount=before-available.length;
+    }
+
     // 一度リセットしてから、空いている時間だけを選択状態にする
     clearAll();
-    (d.available||[]).forEach(hhmm=>{
+    available.forEach(hhmm=>{
       const jp=HHMM_TO_JP[hhmm];
       if(!jp) return;
       const btn=document.querySelector(`.t-btn[data-time="${jp}"]`);
@@ -354,7 +368,7 @@ async function autoFetchAvailability(){
       }
     });
     renderChips();
-    statusEl.textContent=`✅ ${d.available.length}件の空き時間を自動反映しました`;
+    statusEl.textContent=`✅ ${available.length}件の空き時間を自動反映しました`+(filteredCount>0?`（本日分・終了済みの${filteredCount}枠は除外）`:'');
   }catch(e){
     statusEl.textContent='❌ 通信エラー：'+e.message;
   }
