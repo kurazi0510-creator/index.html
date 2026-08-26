@@ -605,7 +605,7 @@ function generateYoyaku(){
   ctx.fillStyle=bgG;
   ctx.fillRect(0,0,SIZE,SIZE);
 
-  // ── 斜めストライプ質感（背景の柄。選んだパターンによって切り替える）──
+  // ── 背景の柄（選んだパターンによって切り替える）──
   const pattern=document.getElementById('yPattern')?.value||'stripe';
   ctx.save();
   if(pattern==='stripe'){
@@ -615,23 +615,38 @@ function generateYoyaku(){
       ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+SIZE,SIZE);ctx.stroke();
     }
   }else if(pattern==='dot'){
-    ctx.fillStyle=T.stripColor.replace(/[\d.]+\)$/,'0.5)');
-    for(let yy=20;yy<SIZE;yy+=54){
-      for(let xx=(yy/54)%2===0?20:47;xx<SIZE;xx+=54){
-        ctx.beginPath();ctx.arc(xx,yy,7,0,Math.PI*2);ctx.fill();
-      }
-    }
+    // 大小の円をランダムに散らした、コンフェッティ（紙吹雪）風の上品なドット柄
+    const seed=[[70,60,10,0.14],[220,140,5,0.22],[400,90,16,0.10],[610,180,7,0.20],[130,260,6,0.18],
+      [340,300,13,0.12],[520,340,4,0.24],[720,260,9,0.16],[60,420,7,0.20],[250,470,11,0.13],
+      [460,510,5,0.22],[660,470,15,0.10],[110,600,9,0.18],[330,640,6,0.20],[540,610,12,0.12],
+      [740,600,5,0.22],[200,720,8,0.17],[420,750,14,0.11],[610,730,6,0.20],[30,760,10,0.15]];
+    seed.forEach(([xx,yy,r,a])=>{
+      ctx.globalAlpha=a;
+      ctx.fillStyle='#ffffff';
+      ctx.beginPath();ctx.arc(xx,yy,r,0,Math.PI*2);ctx.fill();
+    });
+    ctx.globalAlpha=1;
   }else if(pattern==='wave'){
-    ctx.strokeStyle=T.stripColor;
-    ctx.lineWidth=6;
-    for(let yy=10;yy<SIZE;yy+=46){
+    // 下部だけに、上品な曲線を1本重ねるデザイン（帯ではなく細いラインの優雅な波）
+    ctx.globalAlpha=0.16;
+    ctx.strokeStyle='#ffffff';
+    ctx.lineWidth=3;
+    [SIZE*0.90, SIZE*0.94, SIZE*0.98].forEach((baseY,idx)=>{
       ctx.beginPath();
-      for(let xx=0;xx<=SIZE;xx+=20){
-        const wy=yy+Math.sin(xx*0.05)*14;
-        if(xx===0)ctx.moveTo(xx,wy);else ctx.lineTo(xx,wy);
+      for(let xx=-20;xx<=SIZE+20;xx+=10){
+        const wy=baseY+Math.sin(xx*0.012+idx*1.4)*20;
+        if(xx===-20)ctx.moveTo(xx,wy);else ctx.lineTo(xx,wy);
       }
       ctx.stroke();
-    }
+    });
+    ctx.globalAlpha=1;
+  }else if(pattern==='plain'){
+    // 無地：何も描かず、控えめな大きい円のアクセントだけを右上・左下にそっと添える上品な仕上げ
+    ctx.globalAlpha=0.06;
+    ctx.fillStyle='#ffffff';
+    ctx.beginPath();ctx.arc(SIZE-30,60,220,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(20,SIZE-40,260,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=1;
   }
   // plain の場合は何も描かない（無地）
   ctx.restore();
