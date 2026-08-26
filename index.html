@@ -191,6 +191,13 @@
       <div class="day-tag" data-color="#8B5FC7" style="background:#8B5FC7;color:#fff">金</div>
       <div class="day-tag" data-color="#E87BA8" style="background:#E87BA8;color:#fff">土</div>
     </div>
+    <label style="display:block;margin-top:10px">背景の柄（毎回変えるとマンネリ防止になります）</label>
+    <select id="yPattern" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:15px;margin-top:4px">
+      <option value="stripe">🎨 斜めストライプ（定番）</option>
+      <option value="dot">🔵 水玉ドット</option>
+      <option value="plain">⬜ シンプル無地</option>
+      <option value="wave">🌊 波模様</option>
+    </select>
   </div>
 
   <div class="panel">
@@ -272,6 +279,16 @@
     <div class="form-row">
       <label>再開日（任意）</label>
       <input type="text" id="kReopen" placeholder="例：5日（月）より通常通り診療します">
+    </div>
+
+    <div class="form-row">
+      <label>デザインの色（毎回変えると見ている人に飽きられにくくなります）</label>
+      <select id="kTheme" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:15px">
+        <option value="0">🟠 オレンジ・あたたかい（定番）</option>
+        <option value="1">🔵 ブルー・さわやか</option>
+        <option value="2">🌸 ピンク・やさしい</option>
+        <option value="3">🌿 グリーン・ナチュラル</option>
+      </select>
     </div>
   </div>
 
@@ -588,13 +605,35 @@ function generateYoyaku(){
   ctx.fillStyle=bgG;
   ctx.fillRect(0,0,SIZE,SIZE);
 
-  // ── 斜めストライプ質感 ──
+  // ── 斜めストライプ質感（背景の柄。選んだパターンによって切り替える）──
+  const pattern=document.getElementById('yPattern')?.value||'stripe';
   ctx.save();
-  ctx.strokeStyle=T.stripColor;
-  ctx.lineWidth=22;
-  for(let i=-SIZE;i<SIZE*2;i+=44){
-    ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+SIZE,SIZE);ctx.stroke();
+  if(pattern==='stripe'){
+    ctx.strokeStyle=T.stripColor;
+    ctx.lineWidth=22;
+    for(let i=-SIZE;i<SIZE*2;i+=44){
+      ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i+SIZE,SIZE);ctx.stroke();
+    }
+  }else if(pattern==='dot'){
+    ctx.fillStyle=T.stripColor.replace(/[\d.]+\)$/,'0.5)');
+    for(let yy=20;yy<SIZE;yy+=54){
+      for(let xx=(yy/54)%2===0?20:47;xx<SIZE;xx+=54){
+        ctx.beginPath();ctx.arc(xx,yy,7,0,Math.PI*2);ctx.fill();
+      }
+    }
+  }else if(pattern==='wave'){
+    ctx.strokeStyle=T.stripColor;
+    ctx.lineWidth=6;
+    for(let yy=10;yy<SIZE;yy+=46){
+      ctx.beginPath();
+      for(let xx=0;xx<=SIZE;xx+=20){
+        const wy=yy+Math.sin(xx*0.05)*14;
+        if(xx===0)ctx.moveTo(xx,wy);else ctx.lineTo(xx,wy);
+      }
+      ctx.stroke();
+    }
   }
+  // plain の場合は何も描かない（無地）
   ctx.restore();
 
   // ── 右下に大きな丸（デザインアクセント）──
@@ -779,6 +818,16 @@ function measureLines(ctx,text,maxW,lineH){
 const LINE_ADD_URL_K='https://line.me/R/ti/p/@qin9307o';
 const HOMEPAGE_URL_K='https://katano-kuraji-seikotsuin.com/';
 
+// 配色バリエーション（見ている人に飽きられないよう毎回使い分けられる）
+const KYUSHIN_THEMES=[
+  {name:'オレンジ',bg:'#fdf8f0',header:'#f5a623',accent:'#c9781a',msg:'#5c4a3a',reopenBg:'#eaf7ee',reopenText:'#2e7d47',photoBorder:'#f0e0c5',footer:'#8a7860'},
+  {name:'ブルー',  bg:'#f2f8fc',header:'#4b8ac9',accent:'#2f6ba3',msg:'#3d4a52',reopenBg:'#eaf7ee',reopenText:'#2e7d47',photoBorder:'#d9e8f2',footer:'#5a7284'},
+  {name:'ピンク',  bg:'#fdf3f5',header:'#e08aa0',accent:'#c25b76',msg:'#5c3a44',reopenBg:'#eaf7ee',reopenText:'#2e7d47',photoBorder:'#f5dbe2',footer:'#8a6470'},
+  {name:'グリーン',bg:'#f5f9f3',header:'#6ba368',accent:'#4a7d47',msg:'#3d4a3a',reopenBg:'#eef6fb',reopenText:'#2f6ba3',photoBorder:'#dcebd8',footer:'#6b8265'},
+];
+// 休診の種類ごとのヘッダーアイコン
+const KYUSHIN_ICONS={kyukyushin:'🚨',holiday:'🎌',kenshu:'📚',custom:'🏥'};
+
 function loadImg(src){
   return new Promise((resolve)=>{
     const img=new Image();
@@ -798,6 +847,9 @@ async function generateKyushin(){
   const reason=document.getElementById('kReason').value||'休診のお知らせ';
   const msg=document.getElementById('kMessage').value;
   const reopen=document.getElementById('kReopen').value;
+  const themeIdx=parseInt(document.getElementById('kTheme').value)||0;
+  const T=KYUSHIN_THEMES[themeIdx];
+  const icon=KYUSHIN_ICONS[kType]||'🏥';
 
   const SIZE=800;
   const canvas=document.getElementById('kCanvas');
@@ -807,98 +859,98 @@ async function generateKyushin(){
   // 先に画像（外観写真・LINE QR・ホームページQR）を全て読み込んでおく
   const [photo, lineQr, hpQr]=await Promise.all([
     loadImg('data:image/jpeg;base64,'+PHOTO_B64),
-    loadImg('https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data='+encodeURIComponent(LINE_ADD_URL_K)),
-    loadImg('https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data='+encodeURIComponent(HOMEPAGE_URL_K)),
+    loadImg('https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data='+encodeURIComponent(LINE_ADD_URL_K)),
+    loadImg('https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data='+encodeURIComponent(HOMEPAGE_URL_K)),
   ]);
 
-  // ---- 背景（明るいクリーム色） ----
-  ctx.fillStyle='#fdf8f0';ctx.fillRect(0,0,SIZE,SIZE);
+  // ---- 背景 ----
+  ctx.fillStyle=T.bg;ctx.fillRect(0,0,SIZE,SIZE);
 
-  // ---- 上部：温かみのあるオレンジ帯 ----
-  ctx.fillStyle='#f5a623';
-  ctx.fillRect(0,0,SIZE,150);
-  ctx.font='54px serif';ctx.textAlign='center';
-  ctx.fillText('🏥',SIZE/2,72);
+  // ---- 上部帯 ----
+  ctx.fillStyle=T.header;
+  ctx.fillRect(0,0,SIZE,132);
+  ctx.font='44px serif';ctx.textAlign='center';
+  ctx.fillText(icon,SIZE/2,60);
   ctx.fillStyle='#fff';
-  ctx.font='bold 36px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  ctx.fillText(reason,SIZE/2,132);
+  ctx.font='bold 32px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText(reason,SIZE/2,112);
 
   // ---- 休診日ボックス ----
-  const boxY=178, boxH=118;
+  const boxY=150, boxH=100;
   ctx.fillStyle='#fff';
-  rrPath(ctx,40,boxY,SIZE-80,boxH,18);ctx.fill();
-  ctx.strokeStyle='#f5a623';ctx.lineWidth=3;
-  rrPath(ctx,40,boxY,SIZE-80,boxH,18);ctx.stroke();
-  ctx.fillStyle='#c9781a';
-  ctx.font='bold 24px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  rrPath(ctx,40,boxY,SIZE-80,boxH,16);ctx.fill();
+  ctx.strokeStyle=T.header;ctx.lineWidth=3;
+  rrPath(ctx,40,boxY,SIZE-80,boxH,16);ctx.stroke();
+  ctx.fillStyle=T.accent;
+  ctx.font='bold 20px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
   ctx.textAlign='center';
-  ctx.fillText('休 診 日',SIZE/2,boxY+38);
+  ctx.fillText('休 診 日',SIZE/2,boxY+32);
   ctx.fillStyle='#3d3226';
-  ctx.font='bold 46px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
-  ctx.fillText(`${month}月${day}日（${dow}）`,SIZE/2,boxY+92);
+  ctx.font='bold 40px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillText(`${month}月${day}日（${dow}）`,SIZE/2,boxY+78);
 
   // ---- メッセージ ----
-  let my=boxY+boxH+48;
+  let my=boxY+boxH+34;
   if(msg){
-    ctx.font='24px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.font='21px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
     const lines=msg.split('\n');
     lines.forEach(line=>{
-      wrapTextColor(ctx,line,50,my,SIZE-100,34,'#5c4a3a','24px');
-      my+=34*(Math.ceil(ctx.measureText(line).width/(SIZE-100))||1)+6;
+      wrapTextColor(ctx,line,50,my,SIZE-100,29,T.msg,'21px');
+      my+=29*(Math.ceil(ctx.measureText(line).width/(SIZE-100))||1)+4;
     });
   }
 
   // ---- 再開日 ----
   if(reopen){
-    my+=10;
-    ctx.fillStyle='#eaf7ee';
-    rrPath(ctx,50,my,SIZE-100,58,12);ctx.fill();
-    ctx.fillStyle='#2e7d47';
-    ctx.font='bold 24px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    my+=8;
+    ctx.fillStyle=T.reopenBg;
+    rrPath(ctx,50,my,SIZE-100,48,10);ctx.fill();
+    ctx.fillStyle=T.reopenText;
+    ctx.font='bold 20px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
     ctx.textAlign='center';
-    ctx.fillText(reopen,SIZE/2,my+38);
-    my+=58+16;
+    ctx.fillText(reopen,SIZE/2,my+31);
+    my+=48+12;
   }
 
-  // ---- 外観写真（見切れないよう、ゆったりした比率で表示） ----
-  const photoY=Math.max(my,420), photoH=150;
+  // ---- 外観写真 ----
+  const photoY=Math.min(Math.max(my+6,368),400), photoH=126;
   if(photo){
-    ctx.save();rrPath(ctx,40,photoY,SIZE-80,photoH,16);ctx.clip();
+    ctx.save();rrPath(ctx,40,photoY,SIZE-80,photoH,14);ctx.clip();
     const ir=photo.naturalWidth/photo.naturalHeight,br=(SIZE-80)/photoH;
     let sw,sh,sx,sy;
     if(ir>br){sh=photo.naturalHeight;sw=sh*br;sy=0;sx=(photo.naturalWidth-sw)/2;}
     else{sw=photo.naturalWidth;sh=sw/br;sx=0;sy=(photo.naturalHeight-sh)*0.35;}
     ctx.drawImage(photo,sx,sy,sw,sh,40,photoY,SIZE-80,photoH);
     ctx.restore();
-    ctx.strokeStyle='#f0e0c5';ctx.lineWidth=2;
-    rrPath(ctx,40,photoY,SIZE-80,photoH,16);ctx.stroke();
+    ctx.strokeStyle=T.photoBorder;ctx.lineWidth=2;
+    rrPath(ctx,40,photoY,SIZE-80,photoH,14);ctx.stroke();
   }
 
   // ---- QRコード（LINE・ホームページ）：次回予約への動線 ----
-  const qrY=photoY+photoH+30, qrSize=140;
+  const qrY=photoY+photoH+26, qrSize=118;
   ctx.fillStyle='#3d3226';
-  ctx.font='bold 20px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.font='bold 18px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
   ctx.textAlign='center';
-  ctx.fillText('▼ ご予約・お問い合わせはこちらから ▼',SIZE/2,qrY-8);
+  ctx.fillText('▼ ご予約・お問い合わせはこちらから ▼',SIZE/2,qrY-6);
 
-  const qrLeftX=SIZE/2-qrSize-30, qrRightX=SIZE/2+30;
+  const qrLeftX=SIZE/2-qrSize-26, qrRightX=SIZE/2+26;
   [[qrLeftX,lineQr,'💬 LINEで予約','#06c755'],[qrRightX,hpQr,'🌐 ホームページ','#4b8ac9']].forEach(([qx,img,label,color])=>{
     ctx.fillStyle='#fff';
-    rrPath(ctx,qx-6,qrY+14,qrSize+12,qrSize+50,14);ctx.fill();
+    rrPath(ctx,qx-6,qrY+12,qrSize+12,qrSize+44,12);ctx.fill();
     ctx.strokeStyle=color;ctx.lineWidth=2;
-    rrPath(ctx,qx-6,qrY+14,qrSize+12,qrSize+50,14);ctx.stroke();
-    if(img)ctx.drawImage(img,qx,qrY+20,qrSize,qrSize);
+    rrPath(ctx,qx-6,qrY+12,qrSize+12,qrSize+44,12);ctx.stroke();
+    if(img)ctx.drawImage(img,qx,qrY+18,qrSize,qrSize);
     ctx.fillStyle=color;
-    ctx.font='bold 17px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+    ctx.font='bold 15px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
     ctx.textAlign='center';
-    ctx.fillText(label,qx+qrSize/2,qrY+20+qrSize+26);
+    ctx.fillText(label,qx+qrSize/2,qrY+18+qrSize+24);
   });
 
   // ---- フッター ----
-  ctx.fillStyle='#8a7860';
-  ctx.font='bold 18px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  ctx.fillStyle=T.footer;
+  ctx.font='bold 16px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
   ctx.textAlign='center';
-  ctx.fillText('倉治整骨院　TEL：072-892-3223',SIZE/2,SIZE-24);
+  ctx.fillText('倉治整骨院　TEL：072-892-3223',SIZE/2,SIZE-16);
 
   showPreview('kCanvas','kPreview','kDlBtn',`kyushin_${dateVal}`);
 }
